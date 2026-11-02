@@ -25,7 +25,13 @@ function getDuesMsg(){
 
 async function startBot(){
  const { state, saveCreds } = await useMultiFileAuthState('auth');
- const sock = makeWASocket({ auth: state, printQRInTerminal: false });
+ const sock = makeWASocket({ 
+  auth: state, 
+  printQRInTerminal: false,
+  syncFullHistory: false,
+  markOnlineOnConnect: false,
+  shouldSyncHistoryMessage: () => false
+});
  
  sock.ev.on('creds.update', saveCreds);
  
