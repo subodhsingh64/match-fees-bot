@@ -1,11 +1,10 @@
-const makeWASocket = require("@whiskeysockets/baileys").default;
-const { useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
-const cron = require('node-cron');
+import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
+import cron from 'node-cron';
+import qrcode from 'qrcode-terminal';
 
 const PLAYERS = ["Akash","Rajeev","Pramod","Subodh","Mridul","Pranay","Kundan","Spy","Ankit","Avinash","Soumya","Peeyush","Manish","Rishu","Keshav","Sumit","Adarsh","Lokesh"];
 let dues = {}; PLAYERS.forEach(p=>dues[p]=0);
 let lastFee = 250;
-const GROUP_ID = ""; // Will auto-detect first group
 const UPI = "8609276495";
 
 function getDuesMsg(){
@@ -21,12 +20,17 @@ function getDuesMsg(){
 
 async function startBot(){
  const { state, saveCreds } = await useMultiFileAuthState('auth');
- const sock = makeWASocket({ auth: state, printQRInTerminal: true });
+ const sock = makeWASocket({ auth: state, printQRInTerminal: false });
  
  sock.ev.on('creds.update', saveCreds);
  
  sock.ev.on('connection.update', (update)=>{
-   if(update.qr){ console.log("SCAN QR:", update.qr); }
+   const { connection, lastDisconnect, qr } = update;
+   if(qr){
+     console.log("=== SCAN THIS QR WITH WHATSAPP ===");
+     qrcode.generate(qr, {small: true});
+   }
+   if(connection === 'open') console.log("✅ BOT CONNECTED!");
  });
 
  sock.ev.on('messages.upsert', async ({messages})=>{
@@ -37,20 +41,17 @@ async function startBot(){
    const groupId = msg.key.remoteJid;
    
    console.log(`Msg from ${sender}: ${text}`);
-   
    let reply = null;
    
-   // TRIGGER 1: New Match
    if(text.includes("new match")){
      let feeMatch = text.match(/\d+/);
      if(feeMatch){ lastFee = parseInt(feeMatch[0]); }
      let selected = PLAYERS.filter(p=> text.includes(p.toLowerCase()));
-     if(selected.length==0) selected = PLAYERS.slice(0,12); // default first 12 if no names
+     if(selected.length==0) selected = PLAYERS.slice(0,12);
      selected.forEach(p=> dues[p]+=lastFee);
      reply = `✅ NEW MATCH FEE ADDED: Rs ${lastFee}\nTo: ${selected.join(", ")}\n\n` + getDuesMsg();
    }
    
-   // TRIGGER 2: Auto-detect "done" / "paid"
    if((text.includes("done") || text.includes("paid")) && !text.includes("new match")){
      let player = PLAYERS.find(p=> sender.toLowerCase().includes(p.toLowerCase()) || text.includes(p.toLowerCase()));
      if(player && dues[player]>0){
@@ -68,12 +69,13 @@ async function startBot(){
    }
  });
 
- // Daily 9 PM IST (3:30 PM UTC) auto broadcast
  cron.schedule('30 15 * * *', async ()=>{
-   let groups = await sock.groupFetchAllParticipating();
-   for(let id in groups){
-     await sock.sendMessage(id, {text: getDuesMsg()});
-   }
+   try {
+     let groups = await sock.groupFetchAllParticipating();
+     for(let id in groups){
+       await sock.sendMessage(id, {text: getDuesMsg()});
+     }
+   } catch(e){ console.log(e); }
  });
 }
 
