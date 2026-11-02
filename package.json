@@ -1,0 +1,8 @@
+{
+  "name": "match-fees-bot",
+  "dependencies": {
+    "@whiskeysockets/baileys": "latest",
+    "node-cron": "^3.0.0"
+  },
+  "scripts": { "start": "node index.js" }
+}
